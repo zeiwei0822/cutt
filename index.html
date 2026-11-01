@@ -136,7 +136,7 @@
   <div id="room" class="hidden">
     <div class="topbar">
       <h1 style="font-size:22px">🗡️ 割喉<span>冒險隊</span></h1>
-      <div class="code">房間 <b id="codeTxt"></b> <span id="netStatus">連線中…</span> <button class="small" id="btnCopy">邀請連結</button></div>
+      <div class="code">房間 <b id="codeTxt"></b> <span id="netStatus">連線中…</span> <button class="small" id="btnCopy">邀請連結</button> <button class="small" id="btnLeave">離開</button></div>
     </div>
     <div id="game">
       <div>
@@ -178,12 +178,18 @@
 <div id="toast" class="hidden"></div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="game.js"></script>
+<script src="game.js?v=3"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 const PEER_PREFIX = 'cutthroat-caverns-tw-';
+const APP_VERSION = 3;
 const E = window.CuttEngine;
+// 瀏覽器快取到舊版 game.js 時，強制重新載入一次
+if (!E || E.VERSION !== APP_VERSION) {
+  if (!sessionStorage.getItem('cutt_reloaded')) { sessionStorage.setItem('cutt_reloaded', '1'); location.reload(); }
+} else sessionStorage.removeItem('cutt_reloaded');
+window.addEventListener('error', (e) => toast('發生錯誤：' + e.message + '（請重新整理頁面）', 6000));
 
 let S = null;           // 目前畫面狀態（自己的視角）
 let session = null;     // { role:'host'|'guest', code, token, name }
@@ -334,7 +340,9 @@ function guestConnect() {
   peer.on('error', (err) => {
     if (err.type === 'peer-unavailable') {
       if (!session.token) return backToMenu('找不到這個房間（代碼錯誤或房主已離開）');
-      setNet('找不到房主，重試中…', true); scheduleReconnect(3000);
+      net.unavail = (net.unavail || 0) + 1;
+      if (net.unavail > 6) return backToMenu('房主已離開，或房間不存在');
+      setNet(`找不到房主，重試中…（${net.unavail}）`, true); scheduleReconnect(3000);
     } else { setNet('連線錯誤，重試中…', true); scheduleReconnect(); }
   });
 }
@@ -349,7 +357,7 @@ function scheduleReconnect(ms = 1500) {
 function guestOnData(msg) {
   net.lastMsg = Date.now();
   if (!msg || typeof msg !== 'object') return;
-  if (msg.t === 'welcome') { session.token = msg.token; saveSession(); net.retries = 0; setNet('已連線'); showRoom(); }
+  if (msg.t === 'welcome') { session.token = msg.token; saveSession(); net.retries = 0; net.unavail = 0; setNet('已連線'); showRoom(); }
   else if (msg.t === 'view') applyView(msg.v);
   else if (msg.t === 'res') { const w = net.waits.get(msg.id); if (w) { net.waits.delete(msg.id); w(msg.out); } }
   else if (msg.t === 'fatal') backToMenu(msg.msg);
@@ -420,6 +428,12 @@ $('btnCopy').onclick = async () => {
 const sendChat = () => { const t = $('chatIn').value.trim(); if (t) api({ type: 'chat', text: t }); $('chatIn').value = ''; };
 $('btnChat').onclick = sendChat;
 $('chatIn').onkeydown = (e) => { if (e.key === 'Enter') sendChat(); };
+$('btnLeave').onclick = () => {
+  const warn = session && session.role === 'host' && !session.solo ? '你是房主，離開後所有人都會斷線。確定離開？' : '確定離開這場遊戲？';
+  if (!confirm(warn)) return;
+  if (session && session.role === 'host') localStorage.removeItem('cutt_host_' + session.code);
+  backToMenu();
+};
 $('logToggle').onclick = () => $('logWrap').classList.toggle('collapsed');
 if (matchMedia('(max-width: 760px)').matches) $('logWrap').classList.add('collapsed');
 

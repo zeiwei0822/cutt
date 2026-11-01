@@ -653,5 +653,5 @@
     return { error: '未知指令' };
   }
 
-  window.CuttEngine = { createRoom, restoreRoom, serialize, addPlayer, addBot, handleAction, viewFor, setConnected, MAX_HP };
+  window.CuttEngine = { VERSION: 3, createRoom, restoreRoom, serialize, addPlayer, addBot, handleAction, viewFor, setConnected, MAX_HP };
 })();
