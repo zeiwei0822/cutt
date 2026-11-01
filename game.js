@@ -84,7 +84,7 @@
   function restoreRoom(json, onChange) {
     const room = JSON.parse(json);
     room._onChange = onChange;
-    for (const p of room.players) p.connected = false;
+    for (const p of room.players) p.connected = !!p.bot;
     // 恢復中斷的計時流程
     if (room.phase === 'resolve') {
       if (room.reaction) { room.reaction.passed = {}; room.reaction.deadline = Date.now() + REACT_MS; room._timer = setTimeout(() => closeReaction(room), REACT_MS); }
@@ -117,7 +117,7 @@
 
   const alivePlayers = (room) => room.players.filter((p) => p.alive);
   const byId = (room, id) => room.players.find((p) => p.id === id);
-  const changed = (room) => room._onChange && room._onChange();
+  const changed = (room) => { scheduleBots(room); if (room._onChange) room._onChange(); };
 
   function addPlayer(room, name) {
     if (room.phase !== 'lobby') return { error: '遊戲已開始，無法加入新玩家' };
@@ -126,6 +126,19 @@
     room.players.push(p);
     if (!room.hostId) room.hostId = p.id;
     log(room, `👋 ${p.name} 加入了房間`);
+    changed(room);
+    return { player: p };
+  }
+
+  const BOT_NAMES = ['鐵鎚', '毒蛇', '狐狸', '老K', '影子', '烏鴉', '刀疤', '小丑'];
+  function addBot(room) {
+    if (room.phase !== 'lobby') return { error: '遊戲已開始' };
+    if (room.players.length >= MAX_PLAYERS) return { error: `房間已滿（最多 ${MAX_PLAYERS} 人）` };
+    const used = new Set(room.players.map((p) => p.name));
+    const base = BOT_NAMES.find((n) => !used.has('電腦·' + n)) || String(room.players.length);
+    const p = { id: uid(), token: uid(), name: '電腦·' + base, connected: true, bot: true };
+    room.players.push(p);
+    log(room, `🤖 ${p.name} 加入了房間`);
     changed(room);
     return { player: p };
   }
@@ -436,6 +449,115 @@
     return null;
   }
 
+  // ───────────── 電腦玩家 AI ─────────────
+  // 電腦只看得到自己的手牌和公開資訊（怪物血量、已翻開的牌、威望），不偷看別人。
+  const effDmg = (room, d) => (room.monster.ability === 'armor' ? Math.max(0, d - 5) : d);
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  // 威望最高的其他存活玩家（同分取 HP 高者）— 電腦最想陷害的對象
+  function leaderBesides(room, me, exclude = []) {
+    return alivePlayers(room).filter((x) => x.id !== me.id && !exclude.includes(x.id))
+      .sort((a, b) => b.prestige - a.prestige || b.hp - a.hp)[0];
+  }
+
+  function botChooseCard(room, p) {
+    const hand = p.actionHand, m = room.monster;
+    const heal = hand.find((c) => c.type === 'heal');
+    const guard = hand.find((c) => c.type === 'guard');
+    const atks = hand.filter((c) => c.type === 'attack' && c.value > 0).sort((a, b) => a.value - b.value);
+    const likelyTarget = monsterTargets(room).some((t) => t.id === p.id);
+    if (p.hp <= 22 && heal) return heal;
+    if (likelyTarget && guard && p.hp <= monsterDamage(room) * 2) return guard;
+    // 自己一擊就能收頭 → 用剛好夠的最小牌（先攻越前面越有機會）
+    const killers = atks.filter((c) => effDmg(room, c.value) >= m.curHp);
+    if (killers.length) return killers.find((c) => c.key === 'aim') || killers[0];
+    if (!atks.length) return heal || guard || hand[0];
+    // 怪物血還很多 → 出大牌削血；快死了 → 出中等牌，把大牌留著搶最後一擊
+    if (m.curHp > 90) return atks[atks.length - 1];
+    if (heal && p.hp <= 35 && Math.random() < 0.5) return heal;
+    return atks[Math.floor((atks.length - 1) / 2)];
+  }
+
+  function botReaction(room, p) {
+    const pd = room.pending;
+    if (!pd || pd.cancelled) return null;
+    const ev = p.eventHand.filter((c) => canPlay(room, p, c));
+    const has = (k) => ev.find((c) => c.key === k);
+    const m = room.monster;
+    if (pd.kind === 'player' && pd.target === 'monster') {
+      const kills = effDmg(room, pd.damage) >= m.curHp;
+      if (pd.actorId === p.id) {
+        // 自己差一點打死 → 狂怒祝福補刀
+        if (!kills && has('empower') && effDmg(room, pd.damage + 15) >= m.curHp) return { card: has('empower') };
+        return null;
+      }
+      if (kills && (m.prestige >= 2 || Math.random() < 0.6)) {
+        // 別人要收頭了 → 阻止他！
+        if (has('parry')) return { card: has('parry') };
+        if (has('glance') && effDmg(room, Math.floor(pd.damage / 2)) < m.curHp) return { card: has('glance') };
+        const victim = leaderBesides(room, p, [pd.actorId]);
+        if (has('misdirect') && victim) return { card: has('misdirect'), target: victim.id };
+      }
+    }
+    if (pd.kind === 'monster') {
+      if (pd.targetId === p.id) {
+        const dmg = p.guard ? Math.ceil(pd.damage / 2) : pd.damage;
+        const lethal = dmg >= p.hp;
+        const scapegoat = leaderBesides(room, p);
+        if (has('shove') && scapegoat && (lethal || dmg >= 12 || Math.random() < 0.4)) return { card: has('shove'), target: scapegoat.id };
+        if (has('dodge') && (lethal || dmg >= 14 || p.hp <= 30)) return { card: has('dodge') };
+        if (has('shield') && (lethal || dmg >= 16)) return { card: has('shield') };
+        if (lethal && has('potion')) return { card: has('potion') };
+      } else {
+        const t = byId(room, pd.targetId);
+        // 落井下石：對威望領先者下詛咒
+        if (has('curse') && t.prestige > 0 && t.prestige >= p.prestige && Math.random() < 0.6) return { card: has('curse') };
+      }
+    }
+    if (p.hp <= 20 && has('potion')) return { card: has('potion') };
+    return null;
+  }
+
+  function botKey(room, p) {
+    if (!p.alive) return null;
+    if (room.phase === 'planning' && !p.chosen) return `plan-${room.encounterIdx}-${room.round}`;
+    if (room.reaction && !room.reaction.passed[p.id]) return `react-${room.reaction.seq}`;
+    return null;
+  }
+
+  function scheduleBots(room) {
+    if (!room._botKeys) room._botKeys = {};
+    for (const p of room.players) {
+      if (!p.bot) continue;
+      const key = botKey(room, p);
+      if (!key || room._botKeys[p.id] === key) continue;
+      room._botKeys[p.id] = key;
+      const delay = key.startsWith('plan') ? rand(800, 2200) : rand(600, 1800);
+      setTimeout(() => botAct(room, p.id, key), delay);
+    }
+  }
+
+  function botAct(room, id, key) {
+    const p = byId(room, id);
+    if (!p || botKey(room, p) !== key) return;
+    if (key.startsWith('plan')) {
+      if (p.hp <= 25) { const pot = p.eventHand.find((c) => c.key === 'potion'); if (pot) playEvent(room, p, pot.id); }
+      const card = botChooseCard(room, p);
+      if (card) handleAction(room, p.id, { type: 'choose', cardId: card.id });
+      return;
+    }
+    // 每個待結算動作，電腦最多出一張事件卡
+    const pd = room.pending;
+    if (pd && !(pd.botPlayed && pd.botPlayed[p.id])) {
+      const r = botReaction(room, p);
+      if (r) {
+        pd.botPlayed = { ...(pd.botPlayed || {}), [p.id]: true };
+        if (!playEvent(room, p, r.card.id, r.target)) return; // 出牌成功 → 反應窗重開，稍後再決定
+      }
+    }
+    handleAction(room, p.id, { type: 'pass', seq: room.reaction && room.reaction.seq });
+  }
+
   // ───────────── 對每位玩家的視角（隱藏別人的手牌） ─────────────
   function viewFor(room, me) {
     const showChosen = room.phase === 'resolve';
@@ -445,7 +567,7 @@
       encounterIdx: room.encounterIdx, encounterCount: room.encounters ? room.encounters.length : 0,
       monster: room.monster && room.phase !== 'lobby' ? { ...room.monster, abilityDesc: ABILITY_DESC[room.monster.ability], targetDesc: TARGET_DESC[room.monster.target], curDmg: monsterDamage(room) } : null,
       players: room.players.map((p) => ({
-        id: p.id, name: p.name, hp: p.hp, prestige: p.prestige, alive: p.alive, init: p.init, connected: p.connected,
+        id: p.id, name: p.name, bot: !!p.bot, hp: p.hp, prestige: p.prestige, alive: p.alive, init: p.init, connected: p.connected,
         kills: p.kills || [], guard: p.guard, events: p.eventHand ? p.eventHand.length : 0,
         ready: !!p.chosen, chosen: showChosen && p.chosen ? p.chosen.name : null,
         passed: room.reaction ? !!room.reaction.passed[p.id] : false,
@@ -486,12 +608,17 @@
         if (room.players.length < 2) return { error: '至少需要 2 名玩家（建議 3–6 人）' };
         startGame(room);
         return { ok: true };
+      case 'addBot': {
+        if (p.id !== room.hostId) return { error: '只有房主能加入電腦玩家' };
+        const r = addBot(room);
+        return r.error ? r : { ok: true };
+      }
       case 'kick': {
         if (p.id !== room.hostId || room.phase !== 'lobby') return { error: '只有房主能在大廳踢人' };
         const t = byId(room, body.targetId);
         if (!t || t.id === p.id) return { error: '無效的目標' };
         room.players = room.players.filter((x) => x !== t);
-        log(room, `🚪 ${t.name} 被請離房間`);
+        log(room, t.bot ? `🤖 ${t.name} 離開了` : `🚪 ${t.name} 被請離房間`);
         changed(room);
         return { ok: true, kicked: t.id };
       }
@@ -526,5 +653,5 @@
     return { error: '未知指令' };
   }
 
-  window.CuttEngine = { createRoom, restoreRoom, serialize, addPlayer, handleAction, viewFor, setConnected, MAX_HP };
+  window.CuttEngine = { createRoom, restoreRoom, serialize, addPlayer, addBot, handleAction, viewFor, setConnected, MAX_HP };
 })();

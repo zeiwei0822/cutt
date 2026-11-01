@@ -125,7 +125,8 @@
     <h1>🗡️ 割喉<span>冒險隊</span></h1>
     <div class="dim">大家要合作打倒地城怪物，但<b>只有給出致命一擊的人</b>能拿到威望。活到最後、威望最高的人獲勝。<br>用事件卡格擋隊友、把怪物推給別人、甚至誤傷友軍——背叛是一門藝術。</div>
     <input id="name" placeholder="你的名字" maxlength="12" autocomplete="nickname">
-    <button class="primary" id="btnCreate">建立房間（我當房主）</button>
+    <button class="primary" id="btnSolo">🤖 單人遊戲（對戰電腦）</button>
+    <button id="btnCreate">🌐 建立連線房間（我當房主）</button>
     <div class="row"><input id="joinCode" placeholder="房間代碼" maxlength="4" autocomplete="off"><button id="btnJoin">加入</button></div>
     <button id="btnResume" class="hidden">↩️ 回到上一局</button>
     <div class="err" id="menuErr"></div>
@@ -142,8 +143,8 @@
         <div id="lobby" class="box hidden">
           <h2 style="margin-top:0">等待玩家加入…</h2>
           <div id="lobbyList"></div>
-          <p class="dim">把房間代碼或邀請連結傳給朋友。建議 3–6 人（2 人可測試）。</p>
-          <button class="primary" id="btnStart">開始冒險</button>
+          <p class="dim" id="lobbyHint">把房間代碼或邀請連結傳給朋友，也可以加入電腦玩家補人。最多 6 人。</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="btnAddBot">🤖 加入電腦玩家</button><button class="primary" id="btnStart">開始冒險</button></div>
           <div class="err" id="lobbyErr"></div>
         </div>
         <div id="board" class="hidden">
@@ -200,8 +201,9 @@ function saveSession() {
 function clearSession() { sessionStorage.removeItem('cutt_session'); localStorage.removeItem('cutt_last'); }
 function showRoom() {
   $('menu').classList.add('hidden'); $('room').classList.remove('hidden');
-  $('codeTxt').textContent = session.code;
-  history.replaceState(null, '', `?room=${session.code}`);
+  $('codeTxt').textContent = session.solo ? '單人' : session.code;
+  $('btnCopy').classList.toggle('hidden', !!session.solo);
+  history.replaceState(null, '', session.solo ? location.pathname : `?room=${session.code}`);
 }
 function backToMenu(msg) {
   clearSession();
@@ -215,23 +217,25 @@ const net = { peer: null, conn: null, room: null, conns: new Map(), lastMsg: 0, 
 function newCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; return Array.from({ length: 4 }, () => A[Math.floor(Math.random() * A.length)]).join(''); }
 
 // ── 房主 ──
+function initHostRoom(code, restoreJson) {
+  if (net.room) return;
+  net.room = restoreJson ? E.restoreRoom(restoreJson, onRoomChange) : E.createRoom(code, onRoomChange);
+  if (!restoreJson) {
+    const r = E.addPlayer(net.room, session.name);
+    session.token = r.player.token;
+    if (session.solo) for (let i = 0; i < 3; i++) E.addBot(net.room);
+  }
+  session.code = code; saveSession(); showRoom();
+  const me = hostPlayer(); if (me) E.setConnected(net.room, me.id, true);
+  onRoomChange();
+}
+
 function hostStart(code, restoreJson, attempt = 0) {
+  if (session.solo) { setNet('單人模式'); return initHostRoom(code, restoreJson); }
   setNet('建立主機中…');
   const peer = new Peer(PEER_PREFIX + code);
   net.peer = peer;
-  peer.on('open', () => {
-    setNet('主機運作中');
-    if (!net.room) {
-      net.room = restoreJson ? E.restoreRoom(restoreJson, onRoomChange) : E.createRoom(code, onRoomChange);
-      if (!restoreJson) {
-        const r = E.addPlayer(net.room, session.name);
-        session.token = r.player.token;
-      }
-      session.code = code; saveSession(); showRoom();
-      const me = hostPlayer(); if (me) E.setConnected(net.room, me.id, true);
-      onRoomChange();
-    }
-  });
+  peer.on('open', () => { setNet('主機運作中'); initHostRoom(code, restoreJson); });
   peer.on('connection', (conn) => {
     conn.on('data', (msg) => hostOnData(conn, msg));
     conn.on('close', () => hostDrop(conn));
@@ -387,6 +391,12 @@ function getName() {
   localStorage.setItem('cutt_name', name);
   return name;
 }
+$('btnSolo').onclick = () => {
+  const name = getName(); if (!name) return;
+  session = { role: 'host', solo: true, name, code: null, token: null };
+  hostStart('SOLO', null);
+};
+$('btnAddBot').onclick = () => act({ type: 'addBot' });
 $('btnCreate').onclick = () => {
   const name = getName(); if (!name) return;
   session = { role: 'host', name, code: null, token: null };
@@ -441,11 +451,14 @@ function render() {
 
   if (inLobby) {
     const isHost = S.meId === S.hostId;
-    $('lobbyList').innerHTML = S.players.map((p) => `<div style="padding:6px 0;display:flex;gap:8px;align-items:center">${p.id === S.hostId ? '👑' : '🧝'} ${esc(p.name)}
+    $('lobbyList').innerHTML = S.players.map((p) => `<div style="padding:6px 0;display:flex;gap:8px;align-items:center">${p.id === S.hostId ? '👑' : p.bot ? '🤖' : '🧝'} ${esc(p.name)}
       ${p.id === S.meId ? '<span class="badge">你</span>' : ''}${!p.connected ? '<span class="badge">離線</span>' : ''}
-      ${isHost && p.id !== S.meId ? `<button class="small" data-kick="${p.id}">踢出</button>` : ''}</div>`).join('');
+      ${isHost && p.id !== S.meId ? `<button class="small" data-kick="${p.id}">${p.bot ? '移除' : '踢出'}</button>` : ''}</div>`).join('');
     document.querySelectorAll('[data-kick]').forEach((b) => b.onclick = () => act({ type: 'kick', targetId: b.dataset.kick }));
     $('btnStart').classList.toggle('hidden', !isHost);
+    $('btnAddBot').classList.toggle('hidden', !isHost || S.players.length >= 6);
+    $('lobbyHint').textContent = session.solo ? '你和電腦對手的冒險。可以增減電腦玩家（最多 5 個），準備好就開始。' : '把房間代碼或邀請連結傳給朋友，也可以加入電腦玩家補人。最多 6 人。';
+    $('lobby').querySelector('h2').textContent = session.solo ? '單人遊戲' : '等待玩家加入…';
     return;
   }
 
@@ -470,7 +483,7 @@ function render() {
     else if (S.phase === 'planning') a = p.ready ? '✅ 已選好' : '🤔 思考中…';
     else if (S.phase === 'resolve') a = p.chosen ? `🂠 ${esc(p.chosen)}` : '—';
     if (S.reactionDeadline && p.alive && p.passed) a += ' <span class="badge">略過</span>';
-    return `<div class="${cls}"><div class="nm"><span>${esc(p.name)}${p.id === S.hostId ? ' 👑' : ''}${!p.connected ? ' <span class="badge">離線</span>' : ''}</span>${p.alive && p.init ? `<span class="init">#${p.init}</span>` : ''}</div>
+    return `<div class="${cls}"><div class="nm"><span>${p.bot ? '🤖 ' : ''}${esc(p.name)}${p.id === S.hostId && !session.solo ? ' 👑' : ''}${!p.connected ? ' <span class="badge">離線</span>' : ''}</span>${p.alive && p.init ? `<span class="init">#${p.init}</span>` : ''}</div>
       ${hpBar(p.hp, E.MAX_HP, 'hp')}
       <div class="meta">🏆 ${p.prestige} · 🃏 ${p.events}${p.guard ? ' · 🛡️' : ''}</div>
       <div class="act">${a}</div></div>`;
@@ -579,7 +592,7 @@ const last = JSON.parse(localStorage.getItem('cutt_last') || 'null');
 if (cur && cur.token && (!qRoom || qRoom === cur.code)) resume(cur);
 else if (last && last.token && (!qRoom || qRoom === last.code)) {
   $('btnResume').classList.remove('hidden');
-  $('btnResume').textContent = `↩️ 回到上一局（房間 ${last.code}${last.role === 'host' ? '，你是房主' : ''}）`;
+  $('btnResume').textContent = last.solo ? '↩️ 繼續上一場單人遊戲' : `↩️ 回到上一局（房間 ${last.code}${last.role === 'host' ? '，你是房主' : ''}）`;
   $('btnResume').onclick = () => resume(last);
 }
 </script>
