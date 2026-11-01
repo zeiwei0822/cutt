@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>割喉冒險隊 Online</title>
+<style>
+  :root { --bg:#16121c; --panel:#221c2b; --panel2:#2c2437; --text:#ece6f2; --dim:#9a90a8; --gold:#f2c14e; --red:#e25555; --green:#5cc98a; --blue:#6ea8ff; --border:#3b3248; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: "Microsoft JhengHei","PingFang TC","Noto Sans TC",system-ui,sans-serif; }
+  button { font:inherit; cursor:pointer; border:1px solid var(--border); background:var(--panel2); color:var(--text); border-radius:8px; padding:8px 14px; }
+  button:hover:not(:disabled) { border-color:var(--gold); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.primary { background:var(--gold); color:#2a1d00; border-color:var(--gold); font-weight:700; }
+  input { font:inherit; padding:9px 12px; border-radius:8px; border:1px solid var(--border); background:#120e17; color:var(--text); }
+  .hidden { display:none !important; }
+  .wrap { max-width:1200px; margin:0 auto; padding:16px; }
+  h1 { margin:.2em 0; font-size:30px; letter-spacing:2px; }
+  h1 span { color:var(--red); }
+  .card-box { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; }
+  #menu { max-width:420px; margin:60px auto; display:flex; flex-direction:column; gap:12px; }
+  #menu .row { display:flex; gap:8px; }
+  #menu .row input { flex:1; min-width:0; }
+  .rules { font-size:14px; color:var(--dim); line-height:1.7; }
+  .err { color:var(--red); min-height:1.2em; }
+
+  #game { display:grid; grid-template-columns: 1fr 320px; gap:14px; }
+  @media (max-width: 860px) { #game { grid-template-columns: 1fr; } }
+  .topbar { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .code { font-size:14px; color:var(--dim); }
+  .code b { color:var(--gold); font-size:20px; letter-spacing:3px; }
+
+  .monster { display:flex; gap:16px; align-items:center; }
+  .monster .icon { font-size:64px; line-height:1; }
+  .monster .info { flex:1; }
+  .monster .name { font-size:22px; font-weight:700; }
+  .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:99px; background:var(--panel2); color:var(--dim); margin:4px 4px 0 0; }
+  .tag.gold { color:var(--gold); } .tag.red { color:var(--red); }
+  .bar { height:16px; background:#0e0b12; border-radius:99px; overflow:hidden; margin-top:6px; position:relative; }
+  .bar > i { display:block; height:100%; background:linear-gradient(90deg,#b8323a,#e25555); transition:width .4s; }
+  .bar > span { position:absolute; inset:0; font-size:11px; text-align:center; line-height:16px; }
+  .bar.hp > i { background:linear-gradient(90deg,#2f9a5d,#5cc98a); }
+
+  .players { display:grid; grid-template-columns: repeat(auto-fill,minmax(170px,1fr)); gap:10px; margin-top:14px; }
+  .pl { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:10px; position:relative; }
+  .pl.me { border-color:var(--blue); }
+  .pl.dead { opacity:.45; filter:grayscale(1); }
+  .pl.target { box-shadow:0 0 0 2px var(--red); }
+  .pl.actor { box-shadow:0 0 0 2px var(--gold); }
+  .pl .nm { font-weight:700; display:flex; justify-content:space-between; }
+  .pl .init { background:var(--gold); color:#2a1d00; border-radius:6px; padding:0 7px; font-size:13px; }
+  .pl .meta { font-size:12px; color:var(--dim); margin-top:4px; }
+  .pl .act { margin-top:6px; font-size:13px; min-height:1.3em; }
+  .badge { font-size:11px; padding:1px 6px; border-radius:6px; background:var(--panel2); margin-left:4px; }
+
+  .stage { margin-top:14px; text-align:center; min-height:84px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+  .stage .big { font-size:20px; font-weight:700; }
+  .timer { width:260px; height:6px; background:#0e0b12; border-radius:99px; overflow:hidden; }
+  .timer > i { display:block; height:100%; background:var(--gold); }
+
+  .hand-title { margin:16px 0 6px; font-size:14px; color:var(--dim); display:flex; justify-content:space-between; align-items:center; }
+  .hand { display:flex; gap:10px; flex-wrap:wrap; }
+  .c { width:118px; min-height:150px; border-radius:12px; padding:10px; background:linear-gradient(160deg,#3a2f47,#261f30); border:2px solid var(--border); display:flex; flex-direction:column; gap:6px; cursor:pointer; transition:transform .12s; user-select:none; }
+  .c:hover { transform:translateY(-4px); }
+  .c.sel { border-color:var(--gold); transform:translateY(-8px); }
+  .c.off { opacity:.4; cursor:default; transform:none; }
+  .c .t { font-weight:700; font-size:15px; }
+  .c .v { font-size:34px; font-weight:800; color:var(--red); text-align:center; margin:auto 0; }
+  .c .d { font-size:11px; color:var(--dim); line-height:1.4; }
+  .c.ev { background:linear-gradient(160deg,#2b3a52,#1d2533); }
+  .c.ev.play { border-color:var(--green); box-shadow:0 0 12px #5cc98a55; }
+  .c.ev .when { font-size:11px; color:var(--blue); }
+
+  .side { display:flex; flex-direction:column; gap:10px; }
+  #log { height:460px; overflow-y:auto; font-size:13px; line-height:1.6; }
+  #log div { border-bottom:1px dashed #ffffff0d; padding:2px 0; }
+  .chat { display:flex; gap:6px; } .chat input { flex:1; min-width:0; }
+
+  .modal { position:fixed; inset:0; background:#000a; display:flex; align-items:center; justify-content:center; z-index:9; }
+  .modal .card-box { min-width:280px; display:flex; flex-direction:column; gap:8px; }
+  .over { text-align:center; padding:30px 10px; }
+  .over .big { font-size:28px; color:var(--gold); font-weight:800; }
+  label.chk { font-size:13px; color:var(--dim); display:flex; gap:6px; align-items:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="menu" class="card-box">
+    <h1>🗡️ 割喉<span>冒險隊</span></h1>
+    <div class="rules">大家要合作打倒地城怪物，但<b>只有給出致命一擊的人</b>能拿到威望。活到最後、威望最高的人獲勝。<br>用事件卡格擋隊友的攻擊、把怪物推給別人、甚至誤傷友軍——背叛是一門藝術。</div>
+    <input id="name" placeholder="你的名字" maxlength="12">
+    <button class="primary" id="btnCreate">建立房間</button>
+    <div class="row"><input id="joinCode" placeholder="房間代碼" maxlength="4"><button id="btnJoin">加入</button></div>
+    <div class="err" id="menuErr"></div>
+  </div>
+
+  <div id="room" class="hidden">
+    <div class="topbar">
+      <h1 style="font-size:22px">🗡️ 割喉<span>冒險隊</span></h1>
+      <div class="code">房間代碼 <b id="codeTxt"></b> <button id="btnCopy" style="padding:3px 10px;font-size:12px">複製邀請連結</button></div>
+    </div>
+    <div id="game">
+      <div>
+        <div id="lobby" class="card-box hidden">
+          <h2 style="margin-top:0">等待玩家加入…</h2>
+          <div id="lobbyList"></div>
+          <p class="rules">把房間代碼或邀請連結傳給朋友。建議 3–6 人（2 人可測試）。</p>
+          <button class="primary" id="btnStart">開始冒險</button>
+          <div class="err" id="lobbyErr"></div>
+        </div>
+        <div id="board" class="hidden">
+          <div class="card-box monster" id="monsterBox"></div>
+          <div class="players" id="players"></div>
+          <div class="card-box stage" id="stage"></div>
+          <div class="hand-title"><span>⚔️ 行動卡（計畫階段秘密選一張）</span></div>
+          <div class="hand" id="actionHand"></div>
+          <div class="hand-title"><span>🃏 事件卡（綠框 = 現在可用）</span>
+            <label class="chk"><input type="checkbox" id="autoPass" checked> 沒牌可用時自動略過</label></div>
+          <div class="hand" id="eventHand"></div>
+        </div>
+        <div id="overBox" class="card-box over hidden"></div>
+      </div>
+      <div class="side">
+        <div class="card-box" id="log"></div>
+        <div class="chat"><input id="chatIn" placeholder="說點什麼（或威脅隊友）"><button id="btnChat">送出</button></div>
+        <details class="card-box rules"><summary>📜 規則速覽</summary>
+          <p>每回合：系統隨機發先攻 → 每人秘密選一張行動卡 → 全部翻開，依先攻順序結算 → 最後怪物攻擊。</p>
+          <p>每次攻擊結算前有 9 秒<b>反應時間</b>，任何人都能打出事件卡（格擋、擦傷、狂怒祝福、誤傷…）。有人出牌時間會重置。</p>
+          <p>打出致命一擊者獲得怪物的威望。每場戰鬥後存活者回 10 HP、抽 1 張事件卡。共 8 場遭遇，最後是 BOSS。</p>
+          <p>HP 歸零即淘汰，<b>死人不能贏</b>。最後存活且威望最高者勝利。</p>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="modal hidden"><div class="card-box" id="modalBox"></div></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let S = null, session = null, es = null, autoPassedFor = null;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+async function api(body) {
+  const r = await fetch('/api', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ...session, ...body }) });
+  return r.json();
+}
+
+function connect() {
+  if (es) es.close();
+  es = new EventSource(`/events?code=${session.code}&token=${session.token}`);
+  es.onmessage = (e) => { S = JSON.parse(e.data); S.reactionDeadline = S.reactionLeft != null ? Date.now() + S.reactionLeft : null; render(); };
+  es.onerror = () => {
+    // 伺服器回 404（房間不存在）時 EventSource 會進入 CLOSED
+    if (es.readyState === EventSource.CLOSED) { sessionStorage.removeItem('cc_session'); location.href = location.pathname; }
+  };
+  $('menu').classList.add('hidden'); $('room').classList.remove('hidden');
+  $('codeTxt').textContent = session.code;
+}
+
+async function enter(type) {
+  const name = $('name').value.trim();
+  if (!name) return ($('menuErr').textContent = '請輸入名字');
+  localStorage.setItem('cc_name', name);
+  const r = await fetch('/api', { method:'POST', body: JSON.stringify({ type, name, code: $('joinCode').value.trim().toUpperCase() }) }).then((r) => r.json());
+  if (r.error) return ($('menuErr').textContent = r.error);
+  session = { code: r.code, token: r.token };
+  sessionStorage.setItem('cc_session', JSON.stringify(session));
+  history.replaceState(null, '', `?room=${r.code}`);
+  connect();
+}
+$('btnCreate').onclick = () => enter('create');
+$('btnJoin').onclick = () => enter('join');
+$('btnStart').onclick = async () => { const r = await api({ type:'start' }); $('lobbyErr').textContent = r.error || ''; };
+$('btnCopy').onclick = () => { navigator.clipboard.writeText(`${location.origin}${location.pathname}?room=${session.code}`); $('btnCopy').textContent = '已複製！'; };
+const sendChat = () => { const t = $('chatIn').value.trim(); if (t) api({ type:'chat', text:t }); $('chatIn').value = ''; };
+$('btnChat').onclick = sendChat;
+$('chatIn').onkeydown = (e) => { if (e.key === 'Enter') sendChat(); };
+
+function hpBar(cur, max, cls='') {
+  const pct = Math.max(0, Math.min(100, (cur / max) * 100));
+  return `<div class="bar ${cls}"><i style="width:${pct}%"></i><span>${Math.max(0,cur)} / ${max}</span></div>`;
+}
+
+const WHEN = { player:'反應：玩家攻擊時', monster:'反應：怪物攻擊時', monsterSelf:'反應：怪物攻擊你時', any:'隨時', planning:'計畫階段' };
+
+function render() {
+  if (!S) return;
+  const me = S.players.find((p) => p.id === S.meId);
+  const inLobby = S.phase === 'lobby';
+  $('lobby').classList.toggle('hidden', !inLobby);
+  $('board').classList.toggle('hidden', inLobby);
+  $('overBox').classList.toggle('hidden', S.phase !== 'gameover');
+
+  // 日誌
+  const logEl = $('log'); const atBottom = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
+  logEl.innerHTML = S.log.map((l) => `<div>${esc(l)}</div>`).join('');
+  if (atBottom) logEl.scrollTop = logEl.scrollHeight;
+
+  if (inLobby) {
+    $('lobbyList').innerHTML = S.players.map((p) => `<div style="padding:4px 0">${p.id===S.hostId?'👑':'🧝'} ${esc(p.name)} ${p.id===S.meId?'<span class="badge">你</span>':''}</div>`).join('');
+    $('btnStart').classList.toggle('hidden', S.meId !== S.hostId);
+    return;
+  }
+
+  // 怪物
+  const m = S.monster;
+  if (m) {
+    $('monsterBox').innerHTML = `<div class="icon">${m.icon}</div><div class="info">
+      <div class="name">${esc(m.name)} ${m.boss?'<span class="tag red">BOSS</span>':''}</div>
+      <span class="tag">遭遇 ${S.encounterIdx+1}/${S.encounterCount}</span><span class="tag">第 ${S.round} 回合</span>
+      <span class="tag gold">🏆 ${m.prestige} 威望</span><span class="tag red">⚔️ ${m.curDmg} 傷害</span><span class="tag">🎯 ${esc(m.targetDesc)}</span>
+      ${m.abilityDesc?`<span class="tag">✨ ${esc(m.abilityDesc)}</span>`:''}
+      ${hpBar(m.curHp, m.maxHp)}</div>`;
+  }
+
+  // 玩家
+  const pd = S.pending;
+  $('players').innerHTML = S.players.map((p) => {
+    const cls = ['pl', p.id===S.meId?'me':'', !p.alive?'dead':'', pd && pd.kind==='monster' && pd.targetId===p.id ? 'target':'', pd && pd.kind==='player' && (pd.actorId===p.id) ? 'actor':'', pd && pd.kind==='player' && pd.target===p.id ? 'target':''].join(' ');
+    let act = '';
+    if (!p.alive) act = '☠️ 陣亡';
+    else if (S.phase === 'planning') act = p.ready ? '✅ 已選好' : '🤔 思考中…';
+    else if (S.phase === 'resolve') act = p.chosen ? `🂠 ${esc(p.chosen)}` : '—';
+    if (S.reactionDeadline && p.alive) act += p.passed ? ' <span class="badge">略過</span>' : '';
+    return `<div class="${cls}"><div class="nm"><span>${esc(p.name)}${p.id===S.hostId?' 👑':''}${!p.connected?' <span class="badge">離線</span>':''}</span>${p.alive&&p.init?`<span class="init">#${p.init}</span>`:''}</div>
+      ${hpBar(p.hp, 60, 'hp')}
+      <div class="meta">🏆 ${p.prestige} 威望 · 🃏 ${p.events} 事件卡 ${p.guard?'· 🛡️防禦':''}</div>
+      <div class="act">${act}</div></div>`;
+  }).join('');
+
+  // 中央舞台
+  let stage = '';
+  if (S.phase === 'planning') stage = me.alive ? (S.me.chosen ? `<div class="big">已選擇：${esc(S.me.chosen.name)}</div><button id="btnUnchoose">收回重選</button>` : `<div class="big">選一張行動卡</div><div class="rules">可在此時使用「搶先一步」交換先攻</div>`) : '<div class="big">你已陣亡，靜靜看著他們互相殘殺吧</div>';
+  else if (S.phase === 'resolve' && pd) {
+    const nm = (id) => esc((S.players.find((p) => p.id===id)||{}).name||'?');
+    let txt;
+    if (pd.kind === 'player') txt = `${nm(pd.actorId)} 的「${esc(pd.card)}」→ ${pd.target==='monster' ? esc(m.name) : nm(pd.target)}：<span style="color:var(--red)">${pd.damage}</span> 傷害${pd.cancelled?'（已被格擋）':''}`;
+    else txt = `${esc(m.name)} → ${nm(pd.targetId)}：<span style="color:var(--red)">${pd.damage}</span> 傷害${pd.cancelled?'（已閃避）':''}`;
+    stage = `<div class="big">${txt}</div><div class="timer"><i id="timerBar"></i></div>`;
+    if (me.alive) stage += `<button id="btnPass" ${me.passed?'disabled':''}>${me.passed?'已略過':'略過（不反應）'}</button>`;
+  } else if (S.phase === 'resolve') stage = '<div class="big">結算中…</div>';
+  else if (S.phase === 'intermission') stage = '<div class="big">🏕️ 怪物倒下了！整理裝備，前往下一個房間…</div>';
+  else if (S.phase === 'gameover') stage = '<div class="big">冒險結束</div>';
+  $('stage').innerHTML = stage;
+  if ($('btnUnchoose')) $('btnUnchoose').onclick = () => api({ type:'unchoose' });
+  if ($('btnPass')) $('btnPass').onclick = () => api({ type:'pass' });
+
+  // 行動卡
+  const canChoose = S.phase === 'planning' && me.alive;
+  const acts = [...S.me.actionHand];
+  if (S.me.chosen) acts.unshift(S.me.chosen);
+  $('actionHand').innerHTML = acts.map((c) => {
+    const sel = S.me.chosen && S.me.chosen.id === c.id;
+    const v = c.type === 'attack' ? c.value : c.type === 'heal' ? '💚' : '🛡️';
+    return `<div class="c ${sel?'sel':''} ${canChoose?'':'off'}" data-a="${c.id}"><div class="t">${esc(c.name)}</div><div class="v">${v}</div><div class="d">${esc(c.desc||'')}</div></div>`;
+  }).join('');
+  document.querySelectorAll('[data-a]').forEach((el) => el.onclick = () => { if (canChoose) api({ type:'choose', cardId: +el.dataset.a }); });
+
+  // 事件卡
+  $('eventHand').innerHTML = S.me.eventHand.map((c) => `<div class="c ev ${c.playable?'play':'off'}" data-e="${c.id}"><div class="t">${esc(c.name)}</div><div class="when">${WHEN[c.when]}</div><div class="d">${esc(c.desc)}</div></div>`).join('') || '<div class="rules">沒有事件卡</div>';
+  document.querySelectorAll('[data-e]').forEach((el) => el.onclick = () => {
+    const c = S.me.eventHand.find((x) => x.id === +el.dataset.e);
+    if (!c || !c.playable) return;
+    if (c.target) pickTarget(c); else playEv(c.id);
+  });
+
+  // 自動略過
+  if (S.reactionDeadline && me.alive && !me.passed && $('autoPass').checked && !S.me.eventHand.some((c) => c.playable) && autoPassedFor !== S.pendingSeq) {
+    autoPassedFor = S.pendingSeq;
+    setTimeout(() => api({ type:'pass' }), 400 + Math.random() * 1200); // 隨機延遲，避免洩漏手牌資訊
+  }
+
+  // 結束畫面
+  if (S.phase === 'gameover') {
+    const ranking = [...S.players].sort((a,b) => (b.alive-a.alive) || (b.prestige-a.prestige));
+    const w = S.players.filter((p) => S.winners.includes(p.id)).map((p) => esc(p.name)).join('、');
+    $('overBox').innerHTML = `<div class="big">${w ? `👑 ${w} 獲勝！` : '💀 全軍覆沒'}</div>
+      <div style="margin:16px 0">${ranking.map((p,i) => `<div>${i+1}. ${esc(p.name)} — ${p.prestige} 威望 ${p.alive?'':'（陣亡）'} ${p.kills.length?`· 擊殺：${p.kills.map(esc).join('、')}`:''}</div>`).join('')}</div>
+      ${S.meId===S.hostId?'<button class="primary" id="btnAgain">再玩一局</button>':'<div class="rules">等待房主開新局…</div>'}`;
+    if ($('btnAgain')) $('btnAgain').onclick = () => api({ type:'start' });
+  }
+}
+
+function playEv(cardId, targetId) { api({ type:'event', cardId, targetId }).then((r) => { if (r.error) alert(r.error); }); }
+
+function pickTarget(card) {
+  const opts = S.players.filter((p) => p.alive && p.id !== S.meId && !(card.key==='misdirect' && S.pending && p.id===S.pending.actorId));
+  $('modalBox').innerHTML = `<b>${esc(card.name)}：選擇目標</b>` + opts.map((p) => `<button data-t="${p.id}">${esc(p.name)}（${p.hp} HP）</button>`).join('') + `<button id="mCancel">取消</button>`;
+  $('modal').classList.remove('hidden');
+  $('modalBox').querySelectorAll('[data-t]').forEach((b) => b.onclick = () => { $('modal').classList.add('hidden'); playEv(card.id, b.dataset.t); });
+  $('mCancel').onclick = () => $('modal').classList.add('hidden');
+}
+
+// 反應計時條
+setInterval(() => {
+  const bar = $('timerBar');
+  if (bar && S && S.reactionDeadline) bar.style.width = Math.max(0, (S.reactionDeadline - Date.now()) / 9000 * 100) + '%';
+}, 100);
+
+// 啟動：嘗試重連或預填房間代碼
+$('name').value = localStorage.getItem('cc_name') || '';
+const qRoom = new URLSearchParams(location.search).get('room');
+if (qRoom) $('joinCode').value = qRoom;
+const saved = JSON.parse(sessionStorage.getItem('cc_session') || 'null');
+if (saved && (!qRoom || qRoom === saved.code)) { session = saved; connect(); }
+</script>
+</body>
+</html>

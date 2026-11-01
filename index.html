@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16121c">
+<title>割喉冒險隊 Online</title>
+<style>
+  :root { --bg:#16121c; --panel:#221c2b; --panel2:#2c2437; --text:#ece6f2; --dim:#9a90a8; --gold:#f2c14e; --red:#e25555; --green:#5cc98a; --blue:#6ea8ff; --border:#3b3248; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; background:var(--bg); color:var(--text); font-family: "Microsoft JhengHei","PingFang TC","Noto Sans TC",system-ui,sans-serif; }
+  button { font:inherit; cursor:pointer; border:1px solid var(--border); background:var(--panel2); color:var(--text); border-radius:10px; padding:10px 14px; min-height:42px; touch-action:manipulation; }
+  button:hover:not(:disabled) { border-color:var(--gold); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.primary { background:var(--gold); color:#2a1d00; border-color:var(--gold); font-weight:700; }
+  button.small { min-height:30px; padding:4px 10px; font-size:13px; }
+  input { font:inherit; font-size:16px; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:#120e17; color:var(--text); min-width:0; }
+  .hidden { display:none !important; }
+  .wrap { max-width:1200px; margin:0 auto; padding:16px; padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+  h1 { margin:.2em 0; font-size:30px; letter-spacing:2px; }
+  h1 span { color:var(--red); }
+  .box { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px; }
+  .dim { color:var(--dim); font-size:14px; line-height:1.7; }
+  .err { color:var(--red); min-height:1.2em; font-size:14px; }
+
+  #menu { max-width:420px; margin:40px auto; display:flex; flex-direction:column; gap:12px; }
+  #menu .row { display:flex; gap:8px; } #menu .row input { flex:1; text-transform:uppercase; }
+
+  .topbar { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .code { font-size:14px; color:var(--dim); display:flex; align-items:center; gap:8px; }
+  .code b { color:var(--gold); font-size:20px; letter-spacing:3px; }
+  #netStatus { font-size:12px; padding:2px 8px; border-radius:99px; background:var(--panel2); }
+  #netStatus.bad { background:#5a1f25; color:#ffb3b3; }
+
+  #game { display:grid; grid-template-columns: minmax(0,1fr) 320px; gap:14px; }
+  #game > div { min-width:0; }
+
+  .monster { display:flex; gap:14px; align-items:center; }
+  .monster .icon { font-size:60px; line-height:1; }
+  .monster .info { flex:1; min-width:0; }
+  .monster .name { font-size:21px; font-weight:700; }
+  .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:99px; background:var(--panel2); color:var(--dim); margin:4px 4px 0 0; }
+  .tag.gold { color:var(--gold); } .tag.red { color:var(--red); }
+  .bar { height:16px; background:#0e0b12; border-radius:99px; overflow:hidden; margin-top:6px; position:relative; }
+  .bar > i { display:block; height:100%; background:linear-gradient(90deg,#b8323a,#e25555); transition:width .4s; }
+  .bar > span { position:absolute; inset:0; font-size:11px; text-align:center; line-height:16px; }
+  .bar.hp > i { background:linear-gradient(90deg,#2f9a5d,#5cc98a); }
+
+  .players { display:grid; grid-template-columns: repeat(auto-fill,minmax(165px,1fr)); gap:10px; margin-top:12px; }
+  .pl { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:9px; }
+  .pl.me { border-color:var(--blue); }
+  .pl.dead { opacity:.45; filter:grayscale(1); }
+  .pl.target { box-shadow:0 0 0 2px var(--red); }
+  .pl.actor { box-shadow:0 0 0 2px var(--gold); }
+  .pl .nm { font-weight:700; display:flex; justify-content:space-between; gap:4px; }
+  .pl .nm > span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pl .init { background:var(--gold); color:#2a1d00; border-radius:6px; padding:0 7px; font-size:13px; flex:none; }
+  .pl .meta { font-size:12px; color:var(--dim); margin-top:4px; }
+  .pl .act { margin-top:4px; font-size:13px; min-height:1.3em; }
+  .badge { font-size:11px; padding:1px 6px; border-radius:6px; background:var(--panel2); margin-left:4px; }
+
+  .stage { margin-top:12px; text-align:center; min-height:76px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+  .stage .big { font-size:18px; font-weight:700; }
+  .stage.alert { border-color:var(--gold); box-shadow:0 0 18px #f2c14e33; }
+  .timer { width:100%; max-width:300px; height:6px; background:#0e0b12; border-radius:99px; overflow:hidden; }
+  .timer > i { display:block; height:100%; background:var(--gold); }
+
+  .hand-title { margin:14px 0 6px; font-size:14px; color:var(--dim); display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+  .hand { display:flex; gap:10px; flex-wrap:wrap; }
+  .c { width:118px; min-height:150px; border-radius:12px; padding:10px; background:linear-gradient(160deg,#3a2f47,#261f30); border:2px solid var(--border); display:flex; flex-direction:column; gap:6px; cursor:pointer; transition:transform .12s; user-select:none; flex:none; }
+  .c:hover { transform:translateY(-4px); }
+  .c.sel { border-color:var(--gold); transform:translateY(-6px); }
+  .c.off { opacity:.4; cursor:default; transform:none; }
+  .c .t { font-weight:700; font-size:15px; }
+  .c .v { font-size:32px; font-weight:800; color:var(--red); text-align:center; margin:auto 0; }
+  .c .d { font-size:11px; color:var(--dim); line-height:1.4; }
+  .c.ev { background:linear-gradient(160deg,#2b3a52,#1d2533); }
+  .c.ev.play { border-color:var(--green); box-shadow:0 0 12px #5cc98a55; opacity:1; }
+  .c.ev .when { font-size:11px; color:var(--blue); }
+
+  .side { display:flex; flex-direction:column; gap:10px; }
+  #log { height:440px; overflow-y:auto; font-size:13px; line-height:1.6; }
+  #log div { border-bottom:1px dashed #ffffff0d; padding:2px 0; }
+  .chat { display:flex; gap:6px; } .chat input { flex:1; }
+  #logToggle { display:none; }
+
+  .modal { position:fixed; inset:0; background:#000a; display:flex; align-items:center; justify-content:center; z-index:20; padding:16px; }
+  .modal .box { width:100%; max-width:340px; display:flex; flex-direction:column; gap:8px; }
+  .over { text-align:center; padding:24px 10px; margin-top:12px; }
+  .over .big { font-size:26px; color:var(--gold); font-weight:800; }
+  label.chk { font-size:13px; color:var(--dim); display:flex; gap:6px; align-items:center; }
+  #toast { position:fixed; left:50%; top:16px; transform:translateX(-50%); background:#3a1d22; color:#ffd0d0; border:1px solid var(--red); padding:8px 14px; border-radius:10px; z-index:30; font-size:14px; max-width:90vw; }
+
+  /* ───── 手機版面 ───── */
+  @media (max-width: 760px) {
+    .wrap { padding:10px; padding-bottom:calc(10px + env(safe-area-inset-bottom)); }
+    #game { grid-template-columns: minmax(0,1fr); gap:8px; }
+    .topbar h1 { font-size:18px !important; }
+    .monster { gap:10px; padding:10px; }
+    .monster .icon { font-size:40px; }
+    .monster .name { font-size:17px; }
+    .tag { font-size:11px; padding:1px 6px; margin:3px 3px 0 0; }
+    .players { grid-template-columns: repeat(2, 1fr); gap:6px; margin-top:8px; }
+    .pl { padding:7px; } .pl .nm { font-size:14px; }
+    .bar { height:13px; } .bar > span { line-height:13px; font-size:10px; }
+    /* 舞台（反應提示）固定在畫面底部，方便單手操作 */
+    .stage { position:sticky; bottom:calc(6px + env(safe-area-inset-bottom)); z-index:10; background:#221c2bf2; backdrop-filter:blur(6px); min-height:0; padding:10px; }
+    .stage .big { font-size:15px; }
+    .stage button { width:100%; }
+    /* 手牌改成橫向滑動 */
+    .hand { flex-wrap:nowrap; overflow-x:auto; padding:6px 2px 10px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; }
+    .c { width:104px; min-height:138px; scroll-snap-align:start; padding:8px; }
+    .c:hover { transform:none; }
+    .c .v { font-size:28px; }
+    #logToggle { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
+    .side { order:2; }
+    #logWrap.collapsed #log, #logWrap.collapsed .chat, #logWrap.collapsed details { display:none; }
+    #log { height:260px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="menu" class="box">
+    <h1>🗡️ 割喉<span>冒險隊</span></h1>
+    <div class="dim">大家要合作打倒地城怪物，但<b>只有給出致命一擊的人</b>能拿到威望。活到最後、威望最高的人獲勝。<br>用事件卡格擋隊友、把怪物推給別人、甚至誤傷友軍——背叛是一門藝術。</div>
+    <input id="name" placeholder="你的名字" maxlength="12" autocomplete="nickname">
+    <button class="primary" id="btnCreate">建立房間（我當房主）</button>
+    <div class="row"><input id="joinCode" placeholder="房間代碼" maxlength="4" autocomplete="off"><button id="btnJoin">加入</button></div>
+    <button id="btnResume" class="hidden">↩️ 回到上一局</button>
+    <div class="err" id="menuErr"></div>
+    <div class="dim" style="font-size:12px">房主的瀏覽器就是遊戲主機：房主請盡量用電腦，或保持手機螢幕亮著、不要切到別的 App。</div>
+  </div>
+
+  <div id="room" class="hidden">
+    <div class="topbar">
+      <h1 style="font-size:22px">🗡️ 割喉<span>冒險隊</span></h1>
+      <div class="code">房間 <b id="codeTxt"></b> <span id="netStatus">連線中…</span> <button class="small" id="btnCopy">邀請連結</button></div>
+    </div>
+    <div id="game">
+      <div>
+        <div id="lobby" class="box hidden">
+          <h2 style="margin-top:0">等待玩家加入…</h2>
+          <div id="lobbyList"></div>
+          <p class="dim">把房間代碼或邀請連結傳給朋友。建議 3–6 人（2 人可測試）。</p>
+          <button class="primary" id="btnStart">開始冒險</button>
+          <div class="err" id="lobbyErr"></div>
+        </div>
+        <div id="board" class="hidden">
+          <div class="box monster" id="monsterBox"></div>
+          <div class="players" id="players"></div>
+          <div id="overBox" class="box over hidden"></div>
+          <div class="hand-title"><span>⚔️ 行動卡（計畫階段秘密選一張）</span></div>
+          <div class="hand" id="actionHand"></div>
+          <div class="hand-title"><span>🃏 事件卡（綠框 = 現在可用）</span>
+            <label class="chk"><input type="checkbox" id="autoPass" checked> 沒牌可用時自動略過</label></div>
+          <div class="hand" id="eventHand"></div>
+          <div class="box stage" id="stage"></div>
+        </div>
+      </div>
+      <div class="side" id="logWrap">
+        <button id="logToggle">📜 戰鬥日誌 / 聊天</button>
+        <div class="box" id="log"></div>
+        <div class="chat"><input id="chatIn" placeholder="說點什麼（或威脅隊友）" enterkeyhint="send"><button id="btnChat">送出</button></div>
+        <details class="box dim"><summary>📜 規則速覽</summary>
+          <p>每回合：隨機發先攻 → 每人秘密選一張行動卡 → 全部翻開，依先攻順序結算 → 最後怪物攻擊。</p>
+          <p>每次攻擊結算前有 10 秒<b>反應時間</b>，任何人都能打出事件卡（格擋、擦傷、狂怒祝福、誤傷…）。有人出牌時間會重置。</p>
+          <p>打出致命一擊者獲得怪物的威望。每場戰鬥後存活者回 10 HP、抽 1 張事件卡。共 8 場遭遇，最後是 BOSS。</p>
+          <p>HP 歸零即淘汰，<b>死人不能贏</b>。最後存活且威望最高者勝利。</p>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="modal hidden"><div class="box" id="modalBox"></div></div>
+<div id="toast" class="hidden"></div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="game.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const PEER_PREFIX = 'cutthroat-caverns-tw-';
+const E = window.CuttEngine;
+
+let S = null;           // 目前畫面狀態（自己的視角）
+let session = null;     // { role:'host'|'guest', code, token, name }
+let autoPassedFor = null, lastAlertSeq = null;
+
+function toast(msg, ms = 2600) {
+  const t = $('toast'); t.textContent = msg; t.classList.remove('hidden');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), ms);
+}
+function setNet(text, bad) { const n = $('netStatus'); n.textContent = text; n.classList.toggle('bad', !!bad); }
+function saveSession() {
+  sessionStorage.setItem('cutt_session', JSON.stringify(session));
+  localStorage.setItem('cutt_last', JSON.stringify(session));
+}
+function clearSession() { sessionStorage.removeItem('cutt_session'); localStorage.removeItem('cutt_last'); }
+function showRoom() {
+  $('menu').classList.add('hidden'); $('room').classList.remove('hidden');
+  $('codeTxt').textContent = session.code;
+  history.replaceState(null, '', `?room=${session.code}`);
+}
+function backToMenu(msg) {
+  clearSession();
+  if (net.peer) try { net.peer.destroy(); } catch (e) {}
+  location.href = location.pathname + (msg ? '#' + encodeURIComponent(msg) : '');
+}
+
+// ═══════════════ 網路層 ═══════════════
+const net = { peer: null, conn: null, room: null, conns: new Map(), lastMsg: 0, reqId: 0, waits: new Map(), retries: 0 };
+
+function newCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; return Array.from({ length: 4 }, () => A[Math.floor(Math.random() * A.length)]).join(''); }
+
+// ── 房主 ──
+function hostStart(code, restoreJson, attempt = 0) {
+  setNet('建立主機中…');
+  const peer = new Peer(PEER_PREFIX + code);
+  net.peer = peer;
+  peer.on('open', () => {
+    setNet('主機運作中');
+    if (!net.room) {
+      net.room = restoreJson ? E.restoreRoom(restoreJson, onRoomChange) : E.createRoom(code, onRoomChange);
+      if (!restoreJson) {
+        const r = E.addPlayer(net.room, session.name);
+        session.token = r.player.token;
+      }
+      session.code = code; saveSession(); showRoom();
+      const me = hostPlayer(); if (me) E.setConnected(net.room, me.id, true);
+      onRoomChange();
+    }
+  });
+  peer.on('connection', (conn) => {
+    conn.on('data', (msg) => hostOnData(conn, msg));
+    conn.on('close', () => hostDrop(conn));
+    conn.on('error', () => hostDrop(conn));
+  });
+  peer.on('disconnected', () => { setNet('信令中斷，重試中…', true); setTimeout(() => { if (!peer.destroyed) peer.reconnect(); }, 1500); });
+  peer.on('error', (err) => {
+    if (err.type === 'unavailable-id') {
+      peer.destroy();
+      if (restoreJson || net.room) {
+        // 重新整理後舊的 ID 可能還沒釋放，稍等再試
+        if (attempt < 10) { setNet('等待舊連線釋放…', true); setTimeout(() => hostStart(code, restoreJson, attempt + 1), 2000); }
+        else backToMenu('無法恢復房間，請重新建立');
+      } else hostStart(newCode(), null);
+    } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
+      setNet('網路錯誤，重試中…', true);
+    } else console.warn('peer error', err);
+  });
+}
+function hostPlayer() { return net.room && net.room.players.find((p) => p.token === session.token); }
+
+function hostOnData(conn, msg) {
+  const room = net.room;
+  conn._last = Date.now();
+  if (!msg || typeof msg !== 'object') return;
+  if (msg.t === 'ping') return;
+  if (msg.t === 'hello') {
+    let p = msg.token && room.players.find((x) => x.token === msg.token);
+    if (!p) {
+      const r = E.addPlayer(room, msg.name);
+      if (r.error) { conn.send({ t: 'fatal', msg: r.error }); setTimeout(() => conn.close(), 500); return; }
+      p = r.player;
+    }
+    // 同一位玩家的舊連線關掉
+    for (const [c, pid] of net.conns) if (pid === p.id && c !== conn) { net.conns.delete(c); try { c.close(); } catch (e) {} }
+    net.conns.set(conn, p.id);
+    conn.send({ t: 'welcome', token: p.token, code: room.code });
+    E.setConnected(room, p.id, true);
+    onRoomChange();
+    return;
+  }
+  const pid = net.conns.get(conn);
+  if (!pid) return;
+  if (msg.t === 'act') {
+    const out = E.handleAction(room, pid, msg.body);
+    conn.send({ t: 'res', id: msg.id, out });
+    if (out.kicked) kickConn(out.kicked);
+  }
+}
+function kickConn(pid) {
+  for (const [c, id] of net.conns) if (id === pid) { c.send({ t: 'fatal', msg: '你被房主請離房間' }); net.conns.delete(c); setTimeout(() => c.close(), 300); }
+}
+function hostDrop(conn) {
+  const pid = net.conns.get(conn);
+  net.conns.delete(conn);
+  if (pid && ![...net.conns.values()].includes(pid)) E.setConnected(net.room, pid, false);
+}
+
+let saveTimer = null;
+function onRoomChange() {
+  const room = net.room; if (!room) return;
+  for (const [c, pid] of net.conns) {
+    const p = room.players.find((x) => x.id === pid);
+    if (p && c.open) c.send({ t: 'view', v: E.viewFor(room, p) });
+  }
+  const me = hostPlayer();
+  if (me) applyView(E.viewFor(room, me));
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { try { localStorage.setItem('cutt_host_' + room.code, E.serialize(room)); } catch (e) {} }, 300);
+}
+
+// 房主心跳：通知客戶端、清掉沒有回應的連線
+setInterval(() => {
+  if (!net.room) return;
+  const now = Date.now();
+  for (const [c] of [...net.conns]) {
+    if (now - (c._last || now) > 12000) { hostDrop(c); try { c.close(); } catch (e) {} continue; }
+    if (c.open) c.send({ t: 'ping' });
+  }
+}, 3000);
+
+// ── 玩家（客戶端） ──
+function guestConnect() {
+  if (net.peer) try { net.peer.destroy(); } catch (e) {}
+  setNet('連線中…', true);
+  const peer = new Peer();
+  net.peer = peer;
+  peer.on('open', () => {
+    const conn = peer.connect(PEER_PREFIX + session.code, { reliable: true });
+    net.conn = conn;
+    conn.on('open', () => { net.lastMsg = Date.now(); conn.send({ t: 'hello', name: session.name, token: session.token }); });
+    conn.on('data', guestOnData);
+    conn.on('close', () => { if (net.conn === conn) scheduleReconnect(); });
+    conn.on('error', () => { if (net.conn === conn) scheduleReconnect(); });
+  });
+  peer.on('error', (err) => {
+    if (err.type === 'peer-unavailable') {
+      if (!session.token) return backToMenu('找不到這個房間（代碼錯誤或房主已離開）');
+      setNet('找不到房主，重試中…', true); scheduleReconnect(3000);
+    } else { setNet('連線錯誤，重試中…', true); scheduleReconnect(); }
+  });
+}
+function scheduleReconnect(ms = 1500) {
+  clearTimeout(net.rt);
+  setNet('重新連線中…', true);
+  net.rt = setTimeout(() => {
+    if (++net.retries > 40) return backToMenu('與房主的連線中斷太久');
+    guestConnect();
+  }, ms);
+}
+function guestOnData(msg) {
+  net.lastMsg = Date.now();
+  if (!msg || typeof msg !== 'object') return;
+  if (msg.t === 'welcome') { session.token = msg.token; saveSession(); net.retries = 0; setNet('已連線'); showRoom(); }
+  else if (msg.t === 'view') applyView(msg.v);
+  else if (msg.t === 'res') { const w = net.waits.get(msg.id); if (w) { net.waits.delete(msg.id); w(msg.out); } }
+  else if (msg.t === 'fatal') backToMenu(msg.msg);
+}
+// 偵測房主沒有回應（手機休眠回來時特別重要）
+setInterval(() => {
+  if (!session || session.role !== 'guest' || !net.conn) return;
+  if (net.conn.open) net.conn.send({ t: 'ping' });
+  if (Date.now() - net.lastMsg > 10000 && !net.rt_pending) { net.lastMsg = Date.now(); scheduleReconnect(0); }
+}, 3000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !session) return;
+  if (session.role === 'guest' && (!net.conn || !net.conn.open || Date.now() - net.lastMsg > 5000)) scheduleReconnect(0);
+  if (session.role === 'host' && net.peer && net.peer.disconnected && !net.peer.destroyed) net.peer.reconnect();
+});
+
+// ── 統一的指令介面 ──
+function api(body) {
+  if (session.role === 'host') {
+    const me = hostPlayer();
+    const out = E.handleAction(net.room, me.id, body);
+    if (out.kicked) kickConn(out.kicked);
+    return Promise.resolve(out);
+  }
+  return new Promise((resolve) => {
+    if (!net.conn || !net.conn.open) return resolve({ error: '尚未連線，請稍候' });
+    const id = ++net.reqId;
+    net.waits.set(id, resolve);
+    net.conn.send({ t: 'act', id, body });
+    setTimeout(() => { if (net.waits.has(id)) { net.waits.delete(id); resolve({ error: '回應逾時' }); } }, 8000);
+  });
+}
+const act = (body) => api(body).then((r) => { if (r && r.error) toast(r.error); return r; });
+
+// ═══════════════ 介面 ═══════════════
+function getName() {
+  const name = $('name').value.trim();
+  if (!name) { $('menuErr').textContent = '請輸入名字'; return null; }
+  localStorage.setItem('cutt_name', name);
+  return name;
+}
+$('btnCreate').onclick = () => {
+  const name = getName(); if (!name) return;
+  session = { role: 'host', name, code: null, token: null };
+  hostStart(newCode(), null);
+  $('btnCreate').disabled = true; $('menuErr').textContent = '';
+};
+$('btnJoin').onclick = () => {
+  const name = getName(); if (!name) return;
+  const code = $('joinCode').value.trim().toUpperCase();
+  if (code.length !== 4) return ($('menuErr').textContent = '請輸入 4 碼房間代碼');
+  session = { role: 'guest', name, code, token: null };
+  $('btnJoin').disabled = true; $('menuErr').textContent = '連線中…';
+  guestConnect();
+};
+$('btnStart').onclick = async () => { const r = await api({ type: 'start' }); $('lobbyErr').textContent = r.error || ''; };
+$('btnCopy').onclick = async () => {
+  const url = `${location.origin}${location.pathname}?room=${session.code}`;
+  if (navigator.share) { try { await navigator.share({ title: '割喉冒險隊', text: `一起來玩割喉冒險隊！房間代碼 ${session.code}`, url }); return; } catch (e) {} }
+  try { await navigator.clipboard.writeText(url); toast('已複製邀請連結'); } catch (e) { prompt('複製這個連結給朋友：', url); }
+};
+const sendChat = () => { const t = $('chatIn').value.trim(); if (t) api({ type: 'chat', text: t }); $('chatIn').value = ''; };
+$('btnChat').onclick = sendChat;
+$('chatIn').onkeydown = (e) => { if (e.key === 'Enter') sendChat(); };
+$('logToggle').onclick = () => $('logWrap').classList.toggle('collapsed');
+if (matchMedia('(max-width: 760px)').matches) $('logWrap').classList.add('collapsed');
+
+function applyView(v) {
+  v.reactionDeadline = v.reactionLeft != null ? Date.now() + v.reactionLeft : null;
+  S = v; render();
+}
+
+function hpBar(cur, max, cls = '') {
+  const pct = Math.max(0, Math.min(100, (cur / max) * 100));
+  return `<div class="bar ${cls}"><i style="width:${pct}%"></i><span>${Math.max(0, cur)} / ${max}</span></div>`;
+}
+const WHEN = { player: '反應：玩家攻擊時', monster: '反應：怪物攻擊時', monsterSelf: '反應：怪物攻擊你時', any: '隨時', planning: '計畫階段' };
+
+function render() {
+  if (!S) return;
+  const me = S.players.find((p) => p.id === S.meId);
+  if (!me) return;
+  const inLobby = S.phase === 'lobby';
+  $('lobby').classList.toggle('hidden', !inLobby);
+  $('board').classList.toggle('hidden', inLobby);
+  $('overBox').classList.toggle('hidden', S.phase !== 'gameover');
+
+  const logEl = $('log'); const atBottom = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
+  logEl.innerHTML = S.log.map((l) => `<div>${esc(l)}</div>`).join('');
+  if (atBottom) logEl.scrollTop = logEl.scrollHeight;
+  const lastLine = S.log[S.log.length - 1] || '';
+  $('logToggle').textContent = `📜 ${lastLine.slice(0, 28)}${lastLine.length > 28 ? '…' : ''}`;
+
+  if (inLobby) {
+    const isHost = S.meId === S.hostId;
+    $('lobbyList').innerHTML = S.players.map((p) => `<div style="padding:6px 0;display:flex;gap:8px;align-items:center">${p.id === S.hostId ? '👑' : '🧝'} ${esc(p.name)}
+      ${p.id === S.meId ? '<span class="badge">你</span>' : ''}${!p.connected ? '<span class="badge">離線</span>' : ''}
+      ${isHost && p.id !== S.meId ? `<button class="small" data-kick="${p.id}">踢出</button>` : ''}</div>`).join('');
+    document.querySelectorAll('[data-kick]').forEach((b) => b.onclick = () => act({ type: 'kick', targetId: b.dataset.kick }));
+    $('btnStart').classList.toggle('hidden', !isHost);
+    return;
+  }
+
+  const m = S.monster;
+  if (m) {
+    $('monsterBox').innerHTML = `<div class="icon">${m.icon}</div><div class="info">
+      <div class="name">${esc(m.name)} ${m.boss ? '<span class="tag red">BOSS</span>' : ''}</div>
+      <span class="tag">遭遇 ${S.encounterIdx + 1}/${S.encounterCount}</span><span class="tag">第 ${S.round} 回合</span>
+      <span class="tag gold">🏆 ${m.prestige}</span><span class="tag red">⚔️ ${m.curDmg}</span><span class="tag">🎯 ${esc(m.targetDesc)}</span>
+      ${m.abilityDesc ? `<span class="tag">✨ ${esc(m.abilityDesc)}</span>` : ''}
+      ${hpBar(m.curHp, m.maxHp)}</div>`;
+  }
+
+  const pd = S.pending;
+  $('players').innerHTML = S.players.map((p) => {
+    const cls = ['pl', p.id === S.meId ? 'me' : '', !p.alive ? 'dead' : '',
+      pd && pd.kind === 'monster' && pd.targetId === p.id ? 'target' : '',
+      pd && pd.kind === 'player' && pd.actorId === p.id ? 'actor' : '',
+      pd && pd.kind === 'player' && pd.target === p.id ? 'target' : ''].join(' ');
+    let a = '';
+    if (!p.alive) a = '☠️ 陣亡';
+    else if (S.phase === 'planning') a = p.ready ? '✅ 已選好' : '🤔 思考中…';
+    else if (S.phase === 'resolve') a = p.chosen ? `🂠 ${esc(p.chosen)}` : '—';
+    if (S.reactionDeadline && p.alive && p.passed) a += ' <span class="badge">略過</span>';
+    return `<div class="${cls}"><div class="nm"><span>${esc(p.name)}${p.id === S.hostId ? ' 👑' : ''}${!p.connected ? ' <span class="badge">離線</span>' : ''}</span>${p.alive && p.init ? `<span class="init">#${p.init}</span>` : ''}</div>
+      ${hpBar(p.hp, E.MAX_HP, 'hp')}
+      <div class="meta">🏆 ${p.prestige} · 🃏 ${p.events}${p.guard ? ' · 🛡️' : ''}</div>
+      <div class="act">${a}</div></div>`;
+  }).join('');
+
+  // 舞台
+  let stage = '', alert = false;
+  const nm = (id) => esc((S.players.find((p) => p.id === id) || {}).name || '?');
+  if (S.phase === 'planning') {
+    if (!me.alive) stage = '<div class="big">你已陣亡，靜靜看著他們互相殘殺吧</div>';
+    else if (S.me.chosen) stage = `<div class="big">已選擇：${esc(S.me.chosen.name)}</div><button id="btnUnchoose">收回重選</button>`;
+    else { stage = `<div class="big">👇 選一張行動卡</div>`; alert = true; }
+  } else if (S.phase === 'resolve' && pd) {
+    let txt;
+    if (pd.kind === 'player') txt = `${nm(pd.actorId)}「${esc(pd.card)}」→ ${pd.target === 'monster' ? esc(m.name) : nm(pd.target)}：<span style="color:var(--red)">${pd.damage}</span>${pd.cancelled ? '（已被格擋）' : ''}`;
+    else txt = `${esc(m.name)} → ${nm(pd.targetId)}：<span style="color:var(--red)">${pd.damage}</span>${pd.cancelled ? '（已閃避）' : ''}`;
+    stage = `<div class="big">${txt}</div><div class="timer"><i id="timerBar"></i></div>`;
+    if (me.alive) stage += `<button id="btnPass" ${me.passed ? 'disabled' : ''}>${me.passed ? '已略過' : '略過（不反應）'}</button>`;
+    alert = me.alive && !me.passed && S.me.eventHand.some((c) => c.playable);
+  } else if (S.phase === 'resolve') stage = '<div class="big">結算中…</div>';
+  else if (S.phase === 'intermission') stage = '<div class="big">🏕️ 怪物倒下了！前往下一個房間…</div>';
+  else if (S.phase === 'gameover') stage = '<div class="big">冒險結束</div>';
+  $('stage').innerHTML = stage;
+  $('stage').classList.toggle('alert', alert);
+  if ($('btnUnchoose')) $('btnUnchoose').onclick = () => act({ type: 'unchoose' });
+  if ($('btnPass')) $('btnPass').onclick = () => act({ type: 'pass', seq: S.pendingSeq });
+
+  // 有可用反應卡時震動提醒（手機）
+  if (alert && S.pendingSeq && lastAlertSeq !== S.pendingSeq) {
+    lastAlertSeq = S.pendingSeq;
+    if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {}
+  }
+
+  // 行動卡
+  const canChoose = S.phase === 'planning' && me.alive;
+  const acts = [...S.me.actionHand];
+  if (S.me.chosen) acts.unshift(S.me.chosen);
+  $('actionHand').innerHTML = acts.map((c) => {
+    const sel = S.me.chosen && S.me.chosen.id === c.id;
+    const v = c.type === 'attack' ? c.value : c.type === 'heal' ? '💚' : '🛡️';
+    return `<div class="c ${sel ? 'sel' : ''} ${canChoose ? '' : 'off'}" data-a="${c.id}"><div class="t">${esc(c.name)}</div><div class="v">${v}</div><div class="d">${esc(c.desc || '')}</div></div>`;
+  }).join('');
+  document.querySelectorAll('[data-a]').forEach((el) => el.onclick = () => {
+    if (!canChoose) return;
+    const id = +el.dataset.a;
+    if (S.me.chosen && S.me.chosen.id === id) act({ type: 'unchoose' }); else act({ type: 'choose', cardId: id });
+  });
+
+  // 事件卡
+  $('eventHand').innerHTML = S.me.eventHand.map((c) => `<div class="c ev ${c.playable ? 'play' : 'off'}" data-e="${c.id}"><div class="t">${esc(c.name)}</div><div class="when">${WHEN[c.when]}</div><div class="d">${esc(c.desc)}</div></div>`).join('') || '<div class="dim">沒有事件卡</div>';
+  document.querySelectorAll('[data-e]').forEach((el) => el.onclick = () => {
+    const c = S.me.eventHand.find((x) => x.id === +el.dataset.e);
+    if (!c || !c.playable) return;
+    if (c.target) pickTarget(c); else act({ type: 'event', cardId: c.id });
+  });
+
+  // 自動略過（隨機延遲，避免洩漏手牌資訊）
+  if (S.reactionDeadline && me.alive && !me.passed && $('autoPass').checked && !S.me.eventHand.some((c) => c.playable) && autoPassedFor !== S.pendingSeq) {
+    autoPassedFor = S.pendingSeq;
+    const seq = S.pendingSeq;
+    setTimeout(() => api({ type: 'pass', seq }), 500 + Math.random() * 1500);
+  }
+
+  if (S.phase === 'gameover') {
+    const ranking = [...S.players].sort((a, b) => (b.alive - a.alive) || (b.prestige - a.prestige));
+    const w = S.players.filter((p) => S.winners.includes(p.id)).map((p) => esc(p.name)).join('、');
+    $('overBox').innerHTML = `<div class="big">${w ? `👑 ${w} 獲勝！` : '💀 全軍覆沒'}</div>
+      <div style="margin:14px 0;line-height:1.8">${ranking.map((p, i) => `<div>${i + 1}. ${esc(p.name)} — ${p.prestige} 威望 ${p.alive ? '' : '（陣亡）'} ${p.kills.length ? `· 擊殺：${p.kills.map(esc).join('、')}` : ''}</div>`).join('')}</div>
+      ${S.meId === S.hostId ? '<button class="primary" id="btnAgain">再玩一局</button>' : '<div class="dim">等待房主開新局…</div>'}`;
+    if ($('btnAgain')) $('btnAgain').onclick = () => act({ type: 'start' });
+  }
+}
+
+function pickTarget(card) {
+  const opts = S.players.filter((p) => p.alive && p.id !== S.meId && !(card.key === 'misdirect' && S.pending && p.id === S.pending.actorId));
+  $('modalBox').innerHTML = `<b>${esc(card.name)}：選擇目標</b>` + opts.map((p) => `<button data-t="${p.id}">${esc(p.name)}（${p.hp} HP）</button>`).join('') + `<button id="mCancel">取消</button>`;
+  $('modal').classList.remove('hidden');
+  $('modalBox').querySelectorAll('[data-t]').forEach((b) => b.onclick = () => { $('modal').classList.add('hidden'); act({ type: 'event', cardId: card.id, targetId: b.dataset.t }); });
+  $('mCancel').onclick = () => $('modal').classList.add('hidden');
+}
+
+setInterval(() => {
+  const bar = $('timerBar');
+  if (bar && S && S.reactionDeadline) bar.style.width = Math.max(0, (S.reactionDeadline - Date.now()) / S.reactionTotal * 100) + '%';
+}, 100);
+
+// ═══════════════ 啟動 ═══════════════
+if (!window.Peer) document.body.insertAdjacentHTML('afterbegin', '<div class="err" style="padding:12px">無法載入連線元件（PeerJS），請檢查網路後重新整理。</div>');
+$('name').value = localStorage.getItem('cutt_name') || '';
+if (location.hash.length > 1) { $('menuErr').textContent = decodeURIComponent(location.hash.slice(1)); history.replaceState(null, '', location.pathname + location.search); }
+const qRoom = (new URLSearchParams(location.search).get('room') || '').toUpperCase();
+if (qRoom) $('joinCode').value = qRoom;
+
+function resume(s) {
+  session = s;
+  if (s.role === 'host') {
+    const json = localStorage.getItem('cutt_host_' + s.code);
+    if (!json) { clearSession(); return false; }
+    hostStart(s.code, json);
+  } else guestConnect();
+  showRoom();
+  return true;
+}
+const cur = JSON.parse(sessionStorage.getItem('cutt_session') || 'null');
+const last = JSON.parse(localStorage.getItem('cutt_last') || 'null');
+if (cur && cur.token && (!qRoom || qRoom === cur.code)) resume(cur);
+else if (last && last.token && (!qRoom || qRoom === last.code)) {
+  $('btnResume').classList.remove('hidden');
+  $('btnResume').textContent = `↩️ 回到上一局（房間 ${last.code}${last.role === 'host' ? '，你是房主' : ''}）`;
+  $('btnResume').onclick = () => resume(last);
+}
+</script>
+</body>
+</html>
